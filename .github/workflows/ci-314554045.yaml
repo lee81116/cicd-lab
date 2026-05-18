@@ -1,0 +1,61 @@
+name: CI - 314554045
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  ci:
+    name: Code Quality & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prettier check
+        run: npm run format:check
+
+      - name: TypeScript typecheck
+        if: ${{ !cancelled() }}
+        run: npm run typecheck
+
+      - name: Run tests (Vitest with JUnit + GitHub Actions reporters)
+        if: ${{ !cancelled() }}
+        run: |
+          npx vitest run \
+            --reporter=verbose \
+            --reporter=junit \
+            --reporter=github-actions \
+            --outputFile.junit=./test-results/junit.xml
+
+      - name: Upload JUnit artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-results
+          path: test-results/junit.xml
+
+      - name: Publish test report
+        if: ${{ !cancelled() }}
+        uses: dorny/test-reporter@v3
+        with:
+          name: Vitest Report
+          path: test-results/junit.xml
+          reporter: jest-junit
+          fail-on-error: false
